@@ -6,14 +6,14 @@ from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
 from keep_alive import keep_alive
 
-# .env yuklash
+# .env fayldan tokenlarni yuklaymiz
 load_dotenv()
 TOKEN = os.getenv("TELEGRAM_TOKEN")
 HUGGINGFACE_API_KEY = os.getenv("HUGGINGFACE_API_KEY")
 
 bot = telebot.TeleBot(TOKEN)
 
-# User ma'lumotlarini yuklash
+# Foydalanuvchi ma'lumotlarini yuklash/saqlash
 def load_user_data():
     try:
         with open("users.json", "r") as f:
@@ -30,13 +30,13 @@ user_data = load_user_data()
 # Tilga mos prompt
 def get_prompt_by_language(lang, prompt):
     if lang == "uz":
-        return f"Savolga do‘stona, tushunarli va emojili javob yozing. Qisqa va aniq bo‘lsin.\n\nSavol: {prompt}\nJavob:"
+        return f"Savolga do‘stona, tushunarli, faktlarga asoslangan va emojili tarzda javob yozing.\n\nSavol: {prompt}\nJavob:"
     elif lang == "ru":
-        return f"Ответь на вопрос дружелюбно, кратко, с фактами и смайликами.\n\nВопрос: {prompt}\nОтвет:"
+        return f"Ответь на вопрос дружелюбно, точно, с фактами и смайликами.\n\nВопрос: {prompt}\nОтвет:"
     else:
-        return f"Answer in a friendly, factual, emoji-rich style.\n\nQuestion: {prompt}\nAnswer:"
+        return f"Answer in a friendly, factual way with emojis.\n\nQuestion: {prompt}\nAnswer:"
 
-# HuggingFace javobi
+# Hugging Face API orqali javob olish
 def ask_huggingface(prompt):
     API_URL = "https://api-inference.huggingface.co/models/HuggingFaceH4/zephyr-7b-beta"
     headers = {
@@ -51,11 +51,14 @@ def ask_huggingface(prompt):
         response = requests.post(API_URL, headers=headers, json=data)
         if response.status_code == 200:
             output = response.json()
-            if isinstance(output, list) and 'generated_text' in output[0]:
+            if isinstance(output, dict) and 'generated_text' in output:
+                return output['generated_text'].split("Javob:")[-1].strip()
+            elif isinstance(output, list) and 'generated_text' in output[0]:
                 return output[0]['generated_text'].split("Javob:")[-1].strip()
-            return "😕 AI javobi tushunarsiz bo‘ldi."
+            else:
+                return "😕 Javobni tushunmadim."
         elif response.status_code == 503:
-            return "⏳ Model hozir yuklanmoqda. Iltimos, biroz kuting."
+            return "⏳ Model yuklanmoqda, qayta urinib ko‘ring."
         else:
             return f"❌ API xatosi: {response.status_code}"
     except Exception as e:
@@ -77,7 +80,7 @@ def welcome(message):
     )
     bot.send_message(message.chat.id, "Tilni tanlang / Choose your language 👇", reply_markup=markup)
 
-# Til o‘zgartirish
+# Til tanlash
 @bot.callback_query_handler(func=lambda call: call.data.startswith("lang_"))
 def handle_language(call):
     user_id = str(call.message.chat.id)
@@ -98,9 +101,9 @@ def handle_language(call):
 def help_command(message):
     lang = user_data.get(str(message.chat.id), {}).get("language", "uz")
     texts = {
-        "uz": "✳️ Menga savol bering, men qisqa va tushunarli javob beraman. Tilni o‘zgartirish uchun /language ni bosing.",
-        "ru": "✳️ Задайте вопрос, и я отвечу. Чтобы сменить язык, используйте /language.",
-        "en": "✳️ Ask me a question and I’ll reply. Use /language to change language."
+        "uz": "✳️ Savol bering, qisqa va tushunarli javob olasiz. Tilni o‘zgartirish uchun /language ni bosing.",
+        "ru": "✳️ Задайте вопрос. Чтобы сменить язык, нажмите /language.",
+        "en": "✳️ Ask a question. To change the language, use /language."
     }
     bot.reply_to(message, texts[lang])
 
@@ -109,7 +112,7 @@ def help_command(message):
 def language_command(message):
     welcome(message)
 
-# Matnga javob
+# Har qanday matn
 @bot.message_handler(func=lambda m: True)
 def chat(message):
     bot.send_chat_action(message.chat.id, 'typing')
@@ -119,6 +122,7 @@ def chat(message):
     javob = ask_huggingface(prompt)
     bot.reply_to(message, javob)
 
+# Server ishga tushirish
 if __name__ == "__main__":
     keep_alive()
     print("🤖 Bot ishga tushdi...")
