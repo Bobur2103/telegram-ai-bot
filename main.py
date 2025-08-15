@@ -6,6 +6,12 @@ import telebot
 from telebot.types import InlineKeyboardMarkup, InlineKeyboardButton
 from dotenv import load_dotenv
 from keep_alive import keep_alive
+from config import client
+
+# Modeldan foydalanish
+response = client.text_generation("Salom, qandaysan?")
+print("Model javobi:", response)
+
 
 # .env fayldan tokenlarni yuklaymiz
 load_dotenv()
